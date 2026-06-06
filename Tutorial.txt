@@ -450,12 +450,6 @@ make from 10 to 29 slides
 
 
 
-{"action":"talkToNpc","npcInstanceSlug":"bonko","neighborhoodSlug":"bear-town","reqMsgID":1,"serverAck":0,"time":"2026-06-03T02:24:16.154Z","sig":"68hDJT6nj7KjJG2WO3BiPEzQtGo/if/18fb8FJAD5ZI="}
-
-{"reqMsgID":1,"serverAck":0,"action":"spotlightSeen","spotlightId":7,"time":"2026-06-03T02:24:12.022Z","sig":"ybOHVslxFByrEKp3IeW7o1D75pbtqJg4zIJ79h5nTa4="}
-
-
-
 {"action":"startFishing","holeId":8,"baitId":1,"reqMsgID":1,"serverAck":0,"time":"2026-06-02T18:36:38.264Z","sig":"+ixRYcDpbZ2/qJUfe53aXHLZ8IefRhc5qvFuUNFP2R0="}
 
 {"action":"fishEscaped","reqMsgID":1,"serverAck":0,"breakpointsBroken":[8181,0,0,0,0],"time":"2026-06-02T18:36:53.844Z","sig":"pygm+W4HIUaS3u3m6q5LqTRUlZt8RqQXZ4yYOqH4JCE="}

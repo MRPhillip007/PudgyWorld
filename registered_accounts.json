@@ -320,5 +320,45 @@
     "penguin_name": "GlacierJoe21",
     "tutorial_completed": true,
     "proxy_raw": "http://plan-premium-country-us-sid-g6222w4m1vgs:qqj7asip06l3hh6q@relay-eu.proxyshard.com:8080"
+  },
+  "thurin181116@dickensmail.com": {
+    "email": "thurin181116@dickensmail.com",
+    "error": "registration HTTP 400: You tried signing in with thurin181116@dickensmail.com which is already in use by another account. You can sign in using your password.",
+    "verified": false,
+    "proxy_raw": "http://plan-premium-country-us-sid-kh4b942gwolw:qqj7asip06l3hh6q@relay-eu.proxyshard.com:8080",
+    "last_attempt_at": 1780712485
+  },
+  "chadwick536422@thulemail.com": {
+    "email": "chadwick536422@thulemail.com",
+    "session_token": "ory_st_5aCv0L2hybjk4mSR7BXabdoDG3drcUSh",
+    "proxy": "http://plan-premium-country-us-sid-nvphg8e4ewl1:***@relay-eu.proxyshard.com:8080",
+    "verified": true,
+    "registered_at": 1780713770,
+    "label": "auto_0012",
+    "penguin_name": "FrostyBuddy73",
+    "tutorial_completed": true,
+    "proxy_raw": "http://plan-premium-country-us-sid-nvphg8e4ewl1:qqj7asip06l3hh6q@relay-eu.proxyshard.com:8080"
+  },
+  "durant87139@dickensmail.com": {
+    "email": "durant87139@dickensmail.com",
+    "session_token": "ory_st_HXogwSkFTycqbWkurIWh9DJNbDOgzdnr",
+    "proxy": "http://plan-premium-country-us-sid-g3affq7ijymk:***@relay-eu.proxyshard.com:8080",
+    "verified": true,
+    "registered_at": 1780715660,
+    "label": "auto_0013",
+    "penguin_name": "BlubberWave21",
+    "tutorial_completed": true,
+    "proxy_raw": "http://plan-premium-country-us-sid-g3affq7ijymk:qqj7asip06l3hh6q@relay-eu.proxyshard.com:8080"
+  },
+  "isko_3854@thulemail.com": {
+    "email": "isko_3854@thulemail.com",
+    "session_token": "ory_st_E0EFNvUIvCdC8v0I8efGssDHcsmKsOTo",
+    "proxy": "http://plan-premium-country-us-sid-c5q2eiaw5t99:***@relay-eu.proxyshard.com:8080",
+    "verified": true,
+    "registered_at": 1780717275,
+    "label": "auto_0014",
+    "penguin_name": "BlubberPal17",
+    "tutorial_completed": true,
+    "proxy_raw": "http://plan-premium-country-us-sid-c5q2eiaw5t99:qqj7asip06l3hh6q@relay-eu.proxyshard.com:8080"
   }
 }

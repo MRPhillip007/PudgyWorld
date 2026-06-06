@@ -747,78 +747,21 @@ def _robust_start_fishing(sess: "_Session", payload: dict, log) -> int | None:
     return None
 
 
-# Story quest that the Bonko fishEscaped attempts advance. Each counted
-# escape adds one entry to this quest's completedTasks (server-side truth).
-BONKO_STORY_QUEST_ID = "97"
-
-
-def _story_quest_tasks(login_frame: dict, qid: str = BONKO_STORY_QUEST_ID) -> set:
-    """Return the set of completedTasks for story quest `qid` from a
-    loginResponse frame (gameProfile.storyQuestTracker.storyQuestProgress).
-    This is the server's authoritative count of how many Bonko attempts have
-    registered. Empty set on any shape we don't recognise."""
-    try:
-        sqp = (((login_frame or {}).get("gameProfile") or {})
-               .get("storyQuestTracker") or {}).get("storyQuestProgress") or {}
-        q = sqp.get(str(qid)) or {}
-        return set(q.get("completedTasks") or [])
-    except Exception:
-        return set()
-
-
-def _refresh_login_tasks(sess: "_Session", log,
-                         qid: str = BONKO_STORY_QUEST_ID) -> set:
-    """Send `login` on the current session, wait for the fresh loginResponse,
-    and return that quest's completedTasks set. Reconnects on dead socket.
-    Used to read AUTHORITATIVE quest progress before/after a boss fight so we
-    never re-fish (and waste a quest item) for an escape that already
-    counted."""
-    try:
-        _send_signed(sess.ws, {"action": "login"})
-        login = _wait_login_response(sess.ws)
-        sess._last_login = login  # type: ignore[attr-defined]
-    except _DEAD_SOCKET_EXC:
-        if not sess._reconnect():
-            return set()
-        login = getattr(sess, "_last_login", {}) or {}
-    except Exception:
-        login = getattr(sess, "_last_login", {}) or {}
-    return _story_quest_tasks(login, qid)
-
-
 def _robust_fish_fight(sess: "_Session", start_payload: dict,
                        finish_payload: dict, log, fight_index: int = 0) -> str:
-    """One Bonko-style boss attempt, VERIFIED against authoritative server
-    quest state. Flow: read quest baseline -> startFishing -> fishBite ->
-    fishEscaped (breakpointsBroken echoes live breakPoints) -> confirm the
-    quest's completedTasks GREW. We retry until the quest actually advances,
-    but crucially we re-check the quest before every re-fish: if a previous
-    attempt's escape already landed (item consumed, task done) but the socket
-    died before we saw the ack, the re-check sees the growth and we STOP —
-    so we never burn a second quest item for one task. This is the cure for
-    'sometimes the 3rd counts, mostly not': intermittent proxy deaths used to
-    waste the item on a blind re-fish. Returns 'ok' | 'rejected:<id>' |
-    'failed'."""
+    """One ATOMIC boss-fish attempt: startFishing -> fishingStarted ->
+    fishBite -> finish (fishEscaped / fishCaught), all on the SAME live
+    socket. fishEscaped's breakpointsBroken echoes the exact breakPoints the
+    server sent in this fishBite.
+
+    Deliberately simple: we send the attempt once and move on. There is NO
+    re-fish-to-verify-counting and NO mid-fight login refresh — those caused
+    the awful, item-wasting behavior. The only retry is when the socket
+    physically dies before/while we get the bite (the finish can't be sent
+    without an active bite), in which case we re-establish the bite on a
+    fresh socket. Returns 'ok' | 'rejected:<id>' | 'failed'."""
     faction = finish_payload.get("action")
-
-    # fishCaught isn't quest-verified (no story task) — keep the simple
-    # atomic behavior for it.
-    verify = (faction == "fishEscaped")
-    base_tasks = _refresh_login_tasks(sess, log) if verify else set()
-    if verify:
-        log(f"      .. quest {BONKO_STORY_QUEST_ID} baseline "
-            f"completedTasks={sorted(base_tasks)}")
-
     for attempt in range(1, MAX_STEP_ATTEMPTS + 1):
-        # Before each (re)attempt, re-check authoritative progress: if the
-        # quest already advanced past baseline, a prior attempt's escape
-        # landed — STOP, don't waste another item.
-        if verify and attempt > 1:
-            now = _refresh_login_tasks(sess, log)
-            if len(now) > len(base_tasks):
-                log(f"      ✓ escape already counted (completedTasks "
-                    f"{sorted(base_tasks)} -> {sorted(now)}) — not refighting")
-                return "ok"
         try:
             if sess.ws is None and not sess._reconnect():
                 continue
@@ -829,7 +772,7 @@ def _robust_fish_fight(sess: "_Session", start_payload: dict,
             bite = _recv_until(sess.ws, "fishBite", timeout=t + FISH_BITE_BUFFER_SEC)
             fb   = bite.get("fishBite", {}) or {}
             fid  = fb.get("fishId")
-            # 2) build finish payload on the SAME socket
+            # 2) build the finish payload and send it on the SAME socket
             fp = dict(finish_payload)
             if faction == "fishCaught" and fid is not None:
                 fp["fishId"] = fid
@@ -840,7 +783,8 @@ def _robust_fish_fight(sess: "_Session", start_payload: dict,
                     f"(echoed {len(live_bp)} live breakpoints)")
             time.sleep(random.uniform(1.5, 3.0))  # brief fight pacing
             _send_signed(sess.ws, fp)
-            # 3) drain the ack, surfacing any reject + quest progress
+            # 3) drain the ack; surface a reject, and log quest progress for
+            #    visibility (no action taken on it — single attempt).
             captured = {"eid": None, "frames": []}
             def _cap(frame):
                 captured["frames"].append(frame)
@@ -852,41 +796,33 @@ def _robust_fish_fight(sess: "_Session", start_payload: dict,
             if eid and not any(s in eid for s in BENIGN_ERROR_SUBSTRINGS):
                 log(f"      << {faction} rejected: {eid}")
                 return f"rejected:{eid}"
-
-            if not verify:
-                log(f"      .. fight ok (fishId={fid}, {faction})")
-                return "ok"
-
-            # 4) VERIFY against authoritative quest state (don't trust the ack
-            #    alone — confirm the server's completedTasks actually grew).
-            now = _refresh_login_tasks(sess, log)
-            if len(now) > len(base_tasks):
-                log(f"      ✓ escape COUNTED (completedTasks "
-                    f"{sorted(base_tasks)} -> {sorted(now)})  fishId={fid}")
-                return "ok"
-            log(f"      .. escape did NOT advance quest (still "
-                f"{sorted(now)}) — attempt {attempt}/{MAX_STEP_ATTEMPTS}, refighting")
-            time.sleep(random.uniform(1.5, 3.0))
-            continue
+            counted = False
+            for fr in captured["frames"]:
+                act = fr.get("_action", "?")
+                sqp = fr.get("storyQuestProgress") or {}
+                for qid, q in sqp.items():
+                    removed = q.get("itemsRemoved") or []
+                    if removed:
+                        counted = True
+                    log(f"      << {act} quest {qid}: "
+                        f"completed={q.get('completedTasks')} "
+                        f"eligible={q.get('eligibleTasks')} "
+                        f"complete={q.get('complete')} itemsRemoved={removed}")
+            log(f"      .. fight ok (fishId={fid}, {faction}, counted={counted})")
+            return "ok"
         except ServerRejected as e:
             log(f"      << fight rejected: {e.error_id}")
             return f"rejected:{e.error_id}"
         except _DEAD_SOCKET_EXC:
             if attempt < MAX_STEP_ATTEMPTS:
-                log("      .. fight lost (socket died) — will re-check quest then retry")
+                log("      .. fight lost (socket died) — re-establishing bite")
             sess._reconnect()
             continue
         except Exception as e:
             if attempt < MAX_STEP_ATTEMPTS:
-                log(f"      .. fight error ({e!r}) — will re-check quest then retry")
+                log(f"      .. fight error ({e!r}) — re-establishing bite")
             sess._reconnect()
             continue
-    # Exhausted attempts. One final authoritative check before declaring fail.
-    if verify:
-        now = _refresh_login_tasks(sess, log)
-        if len(now) > len(base_tasks):
-            log(f"      ✓ escape counted on final check ({sorted(now)})")
-            return "ok"
     return "failed"
 
 
